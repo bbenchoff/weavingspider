@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bohemian Grove Members</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
+
+  <style>
+    :root {
+      --bg-dark:  #3a1a08;
+      --bg-mid:   #5a2d0c;
+      --bg-light: #7a4d1c;
+      --bg-tan:   #c8a87a;
+      --bg-cream: #f5ead8;
+      --text-dark:#2a1005;
+    }
+    body { background-color: var(--bg-cream); color: var(--text-dark); font-family: 'Georgia', serif; }
+
+    header {
+      background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-mid) 60%, var(--bg-light) 100%);
+      color: #f5ead8; padding: 1.5rem 2rem; margin-bottom: 1.5rem;
+    }
+    header h1 { font-size: 1.8rem; letter-spacing: .04em; margin-bottom: .2rem; }
+    header p  { color: var(--bg-tan); margin: 0; font-size: .9rem; }
+
+    .filter-bar {
+      background: #fff8f0; border: 1px solid var(--bg-tan); border-radius: 8px;
+      padding: .9rem 1.2rem; margin-bottom: 1rem;
+      display: flex; flex-wrap: wrap; align-items: center; gap: 1rem;
+    }
+    .filter-bar label { font-size: .85rem; font-weight: 600; color: var(--bg-mid); margin-bottom: 0; }
+
+    .dataTables_wrapper .dataTables_filter input,
+    .dataTables_wrapper .dataTables_length select {
+      border: 1px solid var(--bg-tan); border-radius: 4px;
+    }
+    .dataTables_wrapper .dataTables_filter input { padding: .3rem .6rem; }
+
+    table.dataTable thead th {
+      background-color: var(--bg-mid); color: #f5ead8;
+      border-bottom: 2px solid var(--bg-dark); white-space: nowrap;
+    }
+    table.dataTable thead th:hover { background-color: var(--bg-light); }
+    table.dataTable tbody tr:nth-child(even) { background-color: #f0e0c8; }
+    table.dataTable tbody tr:hover { background-color: #e8d0a8 !important; cursor: pointer; }
+
+    .cell-truncate { max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; }
+
+    /* Modal */
+    .modal-header { background: var(--bg-mid); color: #f5ead8; }
+    .modal-header .btn-close { filter: invert(1); }
+    .modal-title small { font-size: .75rem; color: var(--bg-tan); display: block; margin-top: .2rem; }
+    .detail-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--bg-light); margin-bottom: .15rem; }
+    .detail-value { margin-bottom: .9rem; word-break: break-word; }
+
+    a { color: var(--bg-mid); }
+    a:hover { color: var(--bg-dark); }
+    footer { text-align: center; padding: 1.5rem; color: #888; font-size: .8rem; margin-top: 2rem; }
+
+    #loadingMsg { text-align: center; padding: 3rem; color: var(--bg-mid); font-style: italic; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Bohemian Grove — Member Research</h1>
+  <p>Data compiled from public sources: SEC EDGAR, OpenSecrets, LinkedIn, web biographies</p>
+</header>
+
+<div class="container-fluid px-4">
+
+  <div class="filter-bar" id="filterBar" style="display:none">
+    <div class="d-flex align-items-center gap-2">
+      <label for="campFilter">Camp:</label>
+      <select id="campFilter" class="form-select form-select-sm" style="min-width:180px;">
+        <option value="">All Camps</option>
+      </select>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <div class="form-check mb-0">
+        <input class="form-check-input" type="checkbox" id="filterEmployer">
+        <label class="form-check-label" for="filterEmployer">Has Employer</label>
+      </div>
+      <div class="form-check mb-0">
+        <input class="form-check-input" type="checkbox" id="filterDonations">
+        <label class="form-check-label" for="filterDonations">Has Donations</label>
+      </div>
+    </div>
+  </div>
+
+  <div id="loadingMsg">Loading member data…</div>
+
+  <div class="table-responsive" id="tableWrap" style="display:none">
+    <table id="membersTable" class="table table-sm table-bordered" style="width:100%">
+      <thead>
+        <tr>
+          <th>Name</th><th>Camp</th><th>Employer</th><th>Title</th>
+          <th>Source</th><th>Donations</th><th>NGOs</th><th>Notes</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- Member detail modal -->
+<div class="modal fade" id="memberModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">
+          <strong id="modal-name"></strong>
+          <small id="modal-camp"></small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="modal-employer-section">
+          <div class="detail-label">Employer</div><div class="detail-value" id="modal-employer"></div>
+          <div class="detail-label">Title</div><div class="detail-value" id="modal-title"></div>
+          <div class="detail-label">Source</div><div class="detail-value" id="modal-source"></div>
+        </div>
+        <div id="modal-donations-section">
+          <div class="detail-label">Political Donations</div><div class="detail-value" id="modal-donations"></div>
+        </div>
+        <div id="modal-ngos-section">
+          <div class="detail-label">NGOs / Boards</div><div class="detail-value" id="modal-ngos"></div>
+        </div>
+        <div id="modal-notes-section">
+          <div class="detail-label">Notes</div><div class="detail-value" id="modal-notes"></div>
+        </div>
+        <div id="modal-empty" class="text-muted fst-italic" style="display:none">
+          No additional research data for this member yet.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>Bohemian Grove Research &mdash; Data from public sources only</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+
+<script>
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+fetch('data.json')
+  .then(r => r.json())
+  .then(function(members) {
+    // Populate camp dropdown
+    var camps = [...new Set(members.map(m => m.camp).filter(Boolean))].sort();
+    var sel = document.getElementById('campFilter');
+    camps.forEach(function(c) {
+      var opt = document.createElement('option');
+      opt.value = c; opt.textContent = c;
+      sel.appendChild(opt);
+    });
+
+    document.getElementById('loadingMsg').style.display = 'none';
+    document.getElementById('filterBar').style.display  = '';
+    document.getElementById('tableWrap').style.display  = '';
+
+    // Custom checkbox filters
+    $.fn.dataTable.ext.search.push(function(settings, data) {
+      if ($('#filterEmployer').is(':checked')  && !data[2].trim()) return false;
+      if ($('#filterDonations').is(':checked') && !data[5].trim()) return false;
+      return true;
+    });
+
+    var table = $('#membersTable').DataTable({
+      data: members,
+      pageLength: 50,
+      order: [[1,'asc'],[0,'asc']],
+      columns: [
+        { data: 'name',      defaultContent: '' },
+        { data: 'camp',      defaultContent: '' },
+        { data: 'employer',  defaultContent: '' },
+        {
+          data: 'title', defaultContent: '',
+          orderable: false,
+          render: function(d) {
+            return d ? '<span class="cell-truncate" title="'+esc(d)+'">'+esc(d)+'</span>' : '';
+          }
+        },
+        {
+          data: 'source', defaultContent: '',
+          orderable: false,
+          render: function(d) {
+            return d ? '<a href="'+esc(d)+'" target="_blank" rel="noopener">link</a>' : '';
+          }
+        },
+        {
+          data: 'donations', defaultContent: '',
+          orderable: false,
+          render: function(d, type, row) {
+            if (!d) return '';
+            if (row.opensecrets)
+              return '<a href="'+esc(row.opensecrets)+'" target="_blank" rel="noopener" title="'+esc(d)+'">OpenSecrets</a>';
+            return '<span class="cell-truncate" title="'+esc(d)+'">'+esc(d)+'</span>';
+          }
+        },
+        {
+          data: 'ngos', defaultContent: '',
+          orderable: false,
+          render: function(d) {
+            return d ? '<span class="cell-truncate" title="'+esc(d)+'">'+esc(d)+'</span>' : '';
+          }
+        },
+        {
+          data: 'notes', defaultContent: '',
+          orderable: false,
+          render: function(d) {
+            return d ? '<span class="cell-truncate" title="'+esc(d)+'">'+esc(d)+'</span>' : '';
+          }
+        }
+      ],
+      language: { search: 'Search all:', lengthMenu: 'Show _MENU_ per page' }
+    });
+
+    // Camp filter
+    $('#campFilter').on('change', function() {
+      var val = $(this).val();
+      table.column(1).search(val ? '^'+$.fn.dataTable.util.escapeRegex(val)+'$' : '', true, false).draw();
+    });
+
+    // Checkbox filters
+    $('#filterEmployer, #filterDonations').on('change', function() { table.draw(); });
+
+    // Row click → modal
+    $('#membersTable tbody').on('click', 'tr', function() {
+      var d = table.row(this).data();
+      if (!d) return;
+      var modal = new bootstrap.Modal(document.getElementById('memberModal'));
+
+      document.getElementById('modal-name').textContent = d.name || '';
+      document.getElementById('modal-camp').textContent = d.camp ? 'Camp: '+d.camp : '';
+
+      var hasAny = false;
+
+      if (d.employer || d.title || d.source) {
+        hasAny = true;
+        document.getElementById('modal-employer').textContent = d.employer || '—';
+        document.getElementById('modal-title').textContent    = d.title    || '—';
+        if (d.source) {
+          document.getElementById('modal-source').innerHTML =
+            '<a href="'+esc(d.source)+'" target="_blank" rel="noopener">'+esc(d.source)+'</a>';
+        } else {
+          document.getElementById('modal-source').textContent = '—';
+        }
+        document.getElementById('modal-employer-section').style.display = '';
+      } else {
+        document.getElementById('modal-employer-section').style.display = 'none';
+      }
+
+      if (d.donations) {
+        hasAny = true;
+        document.getElementById('modal-donations').innerHTML = d.opensecrets
+          ? esc(d.donations)+' &mdash; <a href="'+esc(d.opensecrets)+'" target="_blank" rel="noopener">OpenSecrets</a>'
+          : esc(d.donations);
+        document.getElementById('modal-donations-section').style.display = '';
+      } else {
+        document.getElementById('modal-donations-section').style.display = 'none';
+      }
+
+      if (d.ngos) {
+        hasAny = true;
+        document.getElementById('modal-ngos').textContent = d.ngos;
+        document.getElementById('modal-ngos-section').style.display = '';
+      } else {
+        document.getElementById('modal-ngos-section').style.display = 'none';
+      }
+
+      if (d.notes) {
+        hasAny = true;
+        document.getElementById('modal-notes').textContent = d.notes;
+        document.getElementById('modal-notes-section').style.display = '';
+      } else {
+        document.getElementById('modal-notes-section').style.display = 'none';
+      }
+
+      document.getElementById('modal-empty').style.display = hasAny ? 'none' : '';
+      modal.show();
+    });
+  })
+  .catch(function() {
+    document.getElementById('loadingMsg').textContent = 'Failed to load data.json — make sure you ran build.py first.';
+  });
+</script>
+</body>
+</html>
